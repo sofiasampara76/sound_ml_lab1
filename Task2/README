@@ -1,0 +1,466 @@
+# Filters 
+
+## 1. High-pass Filter
+
+### What it does
+A high-pass filter removes **very low frequencies** and keeps higher ones.
+
+### Main idea
+It cuts off the bottom part of the spectrum:
+- frequencies **below the cutoff** are reduced
+- frequencies **above the cutoff** are mostly kept
+
+For example, with a cutoff of `80 Hz`, the filter weakens components below 80 Hz.
+
+### Intuition
+Very low frequencies in speech recordings often come from:
+- microphone rumble
+- handling noise
+- air-conditioner hum
+- DC-like drift
+
+These components usually are not important for phoneme recognition.
+
+### Why it is useful
+It helps when the recording has unwanted low-frequency energy.
+
+### Risk
+If the cutoff is too high, it can remove useful low-frequency parts of speech and make the voice sound thin.
+
+### In one sentence
+A high-pass filter removes low-frequency noise while keeping most of the speech content above the cutoff.
+
+---
+
+## 2. Low-pass Filter
+
+### What it does
+A low-pass filter removes **very high frequencies** and keeps lower ones.
+
+### Main idea
+It cuts off the top part of the spectrum:
+- frequencies **above the cutoff** are reduced
+- frequencies **below the cutoff** are mostly kept
+
+For example, with a cutoff of `7000 Hz`, the filter weakens components above 7000 Hz.
+
+### Intuition
+This can help reduce:
+- hiss
+- sensor noise
+- some sharp high-frequency artifacts
+
+### Why it is useful
+It is useful if the recording has strong high-frequency noise.
+
+### Risk
+High frequencies are important for many speech sounds, especially:
+- `s`
+- `sh`
+- `f`
+
+So if the cutoff is too low, the speech can become dull and less clear.
+
+### In one sentence
+A low-pass filter removes high-frequency noise, but if used too aggressively it can damage important speech details.
+
+---
+
+## 3. Band-pass Filter
+
+### What it does
+A band-pass filter keeps only a chosen frequency range and removes both very low and very high frequencies.
+
+### Main idea
+It combines:
+- a high-pass filter at the bottom
+- a low-pass filter at the top
+
+For example, `80–7000 Hz` means:
+- reduce frequencies below 80 Hz
+- reduce frequencies above 7000 Hz
+- keep the middle range
+
+### Intuition
+Speech mainly lives in a certain frequency region, so band-pass filtering tries to keep that region and suppress the rest.
+
+### Why it is useful
+It is useful when:
+- there is low-frequency rumble
+- and also high-frequency hiss
+
+### Risk
+If the band is too narrow, useful speech information is removed from both sides.
+
+### In one sentence
+A band-pass filter keeps the main speech range and removes unnecessary frequencies below and above it.
+
+---
+
+## 4. Notch Filter
+
+### What it does
+A notch filter removes **one very narrow frequency region**.
+
+### Main idea
+Instead of cutting a wide range, it targets one specific frequency, for example:
+- `50 Hz`
+- `60 Hz`
+- `120 Hz`
+
+### Intuition
+This is useful for narrowband interference, especially electrical hum from power lines.
+
+For example:
+- in Europe, noise often appears near `50 Hz`
+- in some other systems, near `60 Hz`
+- harmonics may appear at `100`, `120`, `150 Hz`, etc.
+
+### Why it is useful
+It removes a specific annoying tone without affecting the rest of the speech too much.
+
+### Risk
+It only helps when the noise is concentrated at a narrow frequency.  
+It is not useful for broad noise.
+
+### In one sentence
+A notch filter removes one narrow unwanted frequency, usually power-line hum or one sharp spectral peak.
+
+
+---
+
+## 5. Pre-emphasis Filter
+
+### What it does
+Pre-emphasis makes the **high-frequency parts** of speech a bit stronger.
+
+In speech, lower frequencies usually have more energy than higher frequencies. Because of that, high-frequency details can be weaker and less visible. Pre-emphasis balances this a little by boosting the fast changes in the signal.
+
+### Main idea
+Instead of keeping the signal as it is, we compare each sample to the previous one:
+
+$$
+y[n] = x[n] - \alpha x[n-1]
+$$
+
+where:
+- $x[n]$ is the original signal
+- $y[n]$ is the new signal
+- $\alpha$ is usually something like `0.95` or `0.97`
+
+### Intuition
+If the signal changes slowly, the current sample and previous sample are similar, so the result becomes smaller.
+
+If the signal changes quickly, the difference is larger, so that part becomes stronger.
+
+So this filter:
+- reduces slow, smooth components
+- emphasizes fast changes
+
+That is why it behaves a bit like a **high-pass filter**.
+
+### Why it is useful for speech
+Speech contains important information in higher frequencies, especially for sounds like:
+- `s`
+- `sh`
+- `f`
+- `t`
+
+Pre-emphasis can make these parts more noticeable.
+
+It is often used as a **preprocessing step** before extracting speech features.
+
+### Important note
+Pre-emphasis is **not really a denoising method**.  
+It does not try to estimate and remove noise.  
+It only reshapes the spectrum of speech.
+
+So it is better to think of it as:
+- **speech-oriented preprocessing**
+not
+- **noise reduction**
+
+### Advantages
+- very simple
+- very fast
+- common in speech processing
+- can make speech details clearer
+
+### Disadvantages
+- does not directly remove noise
+- can also boost high-frequency noise
+- effect is usually modest
+
+### In one sentence
+Pre-emphasis slightly boosts high-frequency speech details by subtracting part of the previous sample from the current one.
+
+---
+
+## 6. Spectral Subtraction
+
+### What it does
+Spectral subtraction tries to remove noise by:
+1. moving the signal into the frequency domain,
+2. estimating what part is noise,
+3. subtracting that noise from the signal.
+
+### Main idea
+We assume:
+
+$$
+y[n] = x[n] + v[n]
+$$
+
+where:
+- $y[n]$ = noisy signal
+- $x[n]$ = clean speech
+- $v[n]$ = noise
+
+In the frequency domain:
+
+$$
+Y(k,m) = X(k,m) + V(k,m)
+$$
+
+The idea is:
+- estimate the noise spectrum
+- subtract it from the noisy spectrum
+
+A simple version is:
+
+$$
+|\hat X(k,m)| = \max\big(|Y(k,m)| - |\hat V(k,m)|,\ 0\big)
+$$
+
+Then we keep the original phase and reconstruct the signal.
+
+### Why we go to the frequency domain
+Noise is often easier to see in terms of frequency than in the raw waveform.
+
+For example:
+- hum may appear at specific frequencies
+- hiss may appear in high frequencies
+- background noise may create a general spectral floor
+
+So instead of changing the signal directly in time, we subtract noise from its spectrum.
+
+### How it works step by step
+#### Step 1: split the audio into short frames
+Speech changes over time, so we work on small chunks.
+
+#### Step 2: compute STFT
+This gives a spectrum for each short time frame.
+
+#### Step 3: estimate noise
+Usually from the first few frames, assuming they contain mostly noise or silence.
+
+#### Step 4: subtract the noise magnitude
+For each frequency bin, reduce the magnitude by the estimated noise amount.
+
+#### Step 5: rebuild the audio
+Use the modified magnitude + original phase, then apply inverse STFT.
+
+### Why it is useful
+It is one of the most classic speech enhancement methods:
+- easy to understand
+- easy to implement
+- works reasonably well for stationary noise
+
+### What kind of noise it handles best
+It works best when the noise is:
+- relatively stable
+- not changing too fast over time
+
+For example:
+- air conditioner
+- steady background hum
+- constant recording noise
+
+### Main problem
+Its biggest weakness is **musical noise**.
+
+This is an artificial, strange, warbling sound that can appear after subtraction, because some frequency bins are reduced too much and others remain.
+
+It can also remove part of the real speech if the noise estimate is inaccurate.
+
+### Advantages
+- classic baseline method
+- simple idea
+- easy to explain
+- often better than basic time-domain filters
+
+### Disadvantages
+- can create musical noise
+- depends on good noise estimation
+- can distort speech
+- weaker when noise changes over time
+
+### In one sentence
+Spectral subtraction estimates the noise spectrum and removes it from the noisy speech spectrum.
+
+---
+
+## 8. Wiener Filter
+
+### What it does
+The Wiener filter also tries to reduce noise in the frequency domain, but it does it more smoothly than spectral subtraction.
+
+Instead of directly subtracting noise, it computes a **gain** between 0 and 1 for each time-frequency point:
+- close to 1 → keep most of the signal
+- close to 0 → suppress that part strongly
+
+### Main idea
+The Wiener filter tries to keep parts that look like speech and reduce parts that look like noise.
+
+A common formula for the gain is:
+
+$$
+G(k,m) = \frac{S(k,m)}{S(k,m) + N(k,m)}
+$$
+
+where:
+- $S(k,m)$ = estimated speech power
+- $N(k,m)$ = estimated noise power
+
+Then:
+
+$$
+\hat X(k,m) = G(k,m) Y(k,m)
+$$
+
+### Intuition
+If speech power is much larger than noise power:
+- gain is close to 1
+- keep that region
+
+If noise power is large:
+- gain becomes smaller
+- suppress that region
+
+So Wiener filtering is like a **soft mask** over the spectrum.
+
+### How it works step by step
+#### Step 1: split audio into short frames
+Like other spectral methods.
+
+#### Step 2: compute STFT
+Get the time-frequency representation.
+
+#### Step 3: estimate noise
+Often from the first few frames or silent parts.
+
+#### Step 4: compute signal and noise power
+The filter uses power, not just raw amplitude.
+
+#### Step 5: compute Wiener gain
+For each bin, decide how much of the noisy signal to keep.
+
+#### Step 6: reconstruct audio
+Multiply noisy spectrum by the gain and apply inverse STFT.
+
+### Why it is useful
+Compared with spectral subtraction, Wiener filtering is usually:
+- smoother
+- less aggressive
+- less likely to create harsh artifacts
+
+It is a stronger classical baseline for speech enhancement.
+
+### What kind of noise it handles best
+Like spectral subtraction, it works best when:
+- noise estimation is reasonably accurate
+- noise is not extremely non-stationary
+
+### Main tradeoff
+If you suppress too much, speech becomes dull or muffled.  
+If you suppress too little, noise remains.
+
+So Wiener filtering is always balancing:
+- **noise reduction**
+- **speech preservation**
+
+### Advantages
+- smoother than spectral subtraction
+- usually fewer artifacts
+- classic and well-known method
+- good baseline for comparison
+
+### Disadvantages
+- still depends on noise estimation
+- can over-smooth speech
+- may leave residual noise
+- not perfect for fast-changing noise
+
+### In one sentence
+The Wiener filter reduces noise by applying a smooth frequency-dependent gain based on the estimated speech-to-noise ratio.
+
+---
+
+## Very Short Comparison
+
+### Simple filters
+- **High-pass** → removes low-frequency noise
+- **Low-pass** → removes high-frequency noise
+- **Band-pass** → keeps only the main speech range
+- **Notch** → removes one narrow frequency
+
+### Stronger classical methods
+- **Pre-emphasis** → boosts high frequencies
+- **Spectral subtraction** → estimates and subtracts noise
+- **Wiener filter** → smoothly suppresses noise in the spectral domain
+
+---
+
+## Final Summary
+
+**Simple filters** directly remove selected frequency ranges or smooth the waveform.
+
+**Pre-emphasis** is a speech-specific preprocessing step that boosts high-frequency content.
+
+**Spectral subtraction** and **Wiener filtering** are more advanced classical enhancement methods that work in the frequency domain and try to reduce noise more intelligently.
+
+---
+
+## PER Comparison (Filter Predictions vs Original)
+
+This table shows how much each filter changes the model's phoneme predictions from the original audio baseline using Phoneme Error Rate (PER):
+
+| Rank | Filter | Mean PER | Std | S (Substitutions) | D (Deletions) | I (Insertions) |
+|------|--------|----------|-----|-------------------|---------------|----------------|
+| 1 | wiener_filter | 2.08% | 2.29% | 32 | 23 | 33 |
+| 2 | spectral_subtraction | 18.26% | 4.42% | 378 | 207 | 257 |
+| 3 | pre_emphasis | 21.81% | 4.67% | 425 | 274 | 301 |
+| 4 | combined | 29.02% | 6.11% | 635 | 326 | 375 |
+
+**Key Finding:** Wiener filter preserves the original predictions best (2.08% PER), while the combined filter causes the largest deviation (29.02% PER). Lower PER values indicate the filter changes the model's predictions less.
+
+## STOI Results
+
+### What STOI measures
+**STOI (Short-Time Objective Intelligibility)** measures how well the filtered audio preserves the intelligibility of the original speech signal.  
+It compares the filtered audio with the reference audio and returns a score from **0 to 1**:
+- **higher STOI = better**
+- a value closer to **1** means the speech remains more understandable and closer to the original
+
+### Results
+
+| Filter | Mean STOI | Std | Median | Min | Max |
+|---|---:|---:|---:|---:|---:|
+| wiener_filter | 1.0000 | 0.0000 | 1.0000 | 0.9998 | 1.0000 |
+| spectral_subtraction | 0.9999 | 0.0001 | 0.9999 | 0.9994 | 1.0000 |
+| pre_emphasis | 0.9959 | 0.0012 | 0.9960 | 0.9918 | 0.9980 |
+| combined | 0.9162 | 0.0187 | 0.9158 | 0.8787 | 0.9585 |
+
+### Conclusion
+The STOI results show that the original TIMIT recordings are already highly intelligible, so filtering does not improve them further.  
+Among the tested methods, **Wiener filtering** preserved intelligibility best, followed very closely by **spectral subtraction** and **pre-emphasis**, while the **combined filter** caused the largest decrease.  
+Overall, this metric shows that the filters mainly act as **preservation or distortion methods**, not as true enhancement methods for such a clean dataset.
+
+## Ablation Study
+An ablation study was carried out to understand how each filtering method affects the final model quality. Each filter was applied separately, and the results were compared with the original, unfiltered TIMIT audio. This made it possible to see the effect of each method on speech preservation and model behavior.
+
+The results show that TIMIT is already a very clean and high-quality dataset, so additional filtering does not improve it much. In most cases, filtering either has almost no benefit or slightly changes useful speech information. Because of this, the filters act more like preservation or distortion methods than true enhancement methods.
+
+Among all tested approaches, Wiener filtering gave the best overall result. It produced the lowest PER relative to the original reference and the highest STOI score, which means it preserved both the phoneme structure and speech intelligibility best. Spectral subtraction was the second best method: it still preserved the signal quite well, but not as strongly as Wiener filtering. Pre-emphasis had a larger effect on the predictions and did not provide a clear advantage. The combined filtering pipeline performed worst, which suggests that applying several processing steps together introduced more distortion and changed the speech signal too much.
+
+Overall, the ablation study shows that stronger or more complex filtering is not always better, especially when the original audio is already clean. For this dataset, the safest choice was Wiener filtering, while aggressive combined filtering was the least suitable.

@@ -1,0 +1,15 @@
+# Virtual environment
+venv/
+
+# Data folders
+data/
+filters/
+inference_results/
+
+# Checkpoint and model files
+checkpoint_results.json
+wavlm*.pt
+
+# Output files
+per_comparison.png
+sa1_*.wav
